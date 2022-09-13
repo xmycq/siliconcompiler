@@ -2118,6 +2118,31 @@
                         ],
                         "type": "[str]"
                     },
+                    "file": {
+                        "input": {
+                            "default": {
+                                "default": {
+                                    "defvalue": [],
+                                    "example": [
+                                        "cli: -flowgraph_file_input 'asicflow cts 0 def design.def (floorplan, 0)'",
+                                        "api:  chip.set('flowgraph','asicflow', 'cts','0','def', 'design.def', ('floorplan','0'))"
+                                    ],
+                                    "help": "Which task is responsible for providing an input of a certain\ntype/name to the current task. This can be used to restrict which\noutput files of input tasks get copied into the inputs of the\ncurrent task. If this parameter is unused, then all outputs from the\ninput tasks will be copied.",
+                                    "lock": false,
+                                    "node": {},
+                                    "notes": null,
+                                    "pernode": "never",
+                                    "require": null,
+                                    "scope": "job",
+                                    "shorthelp": "Flowgraph: input file source",
+                                    "switch": [
+                                        "-flowgraph_file_input 'flow step index filetype filename <(str, str)>'"
+                                    ],
+                                    "type": "[(str,str)]"
+                                }
+                            }
+                        }
+                    },
                     "goal": {
                         "default": {
                             "defvalue": null,
@@ -6591,6 +6616,27 @@
                                 "-tool_task_file 'tool task key <file>'"
                             ],
                             "type": "[file]"
+                        }
+                    },
+                    "infile": {
+                        "default": {
+                            "defvalue": [],
+                            "example": [
+                                "cli: -tool_task_infile 'openroad floorplan def floorplan 0 floorplan.def'",
+                                "api: chip.set('tool','openroad','task','floorplan','infile','def','floorplan.def',step='floorplan',index='0')"
+                            ],
+                            "help": "Paths to input files of a particular type. This gets set by the\nruntime, and is currently only set by flows that use the\n:keypath:`flowgraph,<flow>,<step>,<index>,file,input` parameter.\nThis parameter can be read by tool scripts or in a tool driver's\n``runtime_options()`` method to avoid hardcoding input file\nnames.",
+                            "lock": false,
+                            "node": {},
+                            "notes": null,
+                            "pernode": "required",
+                            "require": null,
+                            "scope": "job",
+                            "shorthelp": "Task: input file path",
+                            "switch": [
+                                "-tool_infile 'tool step index filetype <str>'"
+                            ],
+                            "type": "[str]"
                         }
                     },
                     "input": {

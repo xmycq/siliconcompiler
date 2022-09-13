@@ -1792,6 +1792,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 in_tasks = self.get('flowgraph', flow, step, index, 'input')
                 all_inputs = set()
                 for in_step, in_index in in_tasks:
+                    copied_inputs = self._inputs_expected_from_task(step, index, in_step, in_index)
                     if in_step not in steplist:
                         # If we're not running the input step, the required
                         # inputs need to already be copied into the build
@@ -1814,6 +1815,8 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                         inputs = self._gather_outputs(in_step, in_index)
 
                     for inp in inputs:
+                        if copied_inputs is not None and inp not in copied_inputs:
+                            continue
                         if inp in all_inputs:
                             self.logger.error(f'Invalid flow: {step}{index} '
                                               f'receives {inp} from multiple input tasks')
@@ -3410,7 +3413,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             self.set('flowgraph', flow, step, index, 'weight', metric, 0)
 
     ###########################################################################
-    def edge(self, flow, tail, head, tail_index=0, head_index=0):
+    def edge(self, flow, tail, head, tail_index=0, head_index=0, files=None):
         '''
         Creates a directed edge from a tail node to a head node.
 
@@ -3420,6 +3423,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         The method modifies the following parameters:
 
         ['flowgraph', flow, head, str(head_index), 'input']
+        ['flowgraph', flow, head, str(head_index), 'file', 'input']
 
         Args:
             flow (str): Name of flow
@@ -3427,6 +3431,9 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             head (str): Name of head node
             tail_index (int): Index of tail node to connect
             head_index (int): Index of head node to connect
+            files (list of tuple): List of files provided by tail to head, as a
+                list of tuples of (filename, filetype). If None, all files are
+                provided by tail to head.
 
         Examples:
             >>> chip.edge('place', 'cts')
@@ -3439,6 +3446,10 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         # Adding
         self.add('flowgraph', flow, head, str(head_index), 'input', (tail, str(tail_index)))
+
+        if files is not None:
+            for filename, filetype in files:
+                self.set('flowgraph', flow, head, str(head_index), 'file', 'input', filetype, filename, (tail, str(tail_index)))
 
     ###########################################################################
     def graph(self, flow, subflow, name=None):
@@ -3614,11 +3625,14 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 self.logger.error(f'Halting step due to previous error in {in_step}{in_index}')
                 self._haltstep(step, index)
 
+            in_files = self._inputs_expected_from_task(step, index, in_step, in_index)
+
             # Skip copying pkg.json files here, since we write the current chip
             # configuration into inputs/{design}.pkg.json earlier in _runstep.
             if not replay:
                 utils.copytree(f"../../../{in_job}/{in_step}/{in_index}/outputs", 'inputs/',
                                dirs_exist_ok=True,
+                               include=in_files, # not very robust, TODO: add checking that these inputs exist?
                                ignore=[f'{design}.pkg.json'],
                                link=True)
 
@@ -3991,10 +4005,15 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
     ###########################################################################
     def _setup_task(self, step, index):
-
         self.set('arg','step', step)
         self.set('arg','index', index)
         tool, task = self._get_tool_task(step, index)
+
+        flow = self.get('option', 'flow')
+        # Set paths to drive tool inputs
+        for filetype in self.getkeys('flowgraph', flow, step, index, 'file', 'input'):
+            for file in self.getkeys('flowgraph', flow, step, index, 'file', 'input', filetype):
+                self.add('tool', tool, 'task', task, 'infile', filetype, os.path.join('inputs', file), step=step, index=index)
 
         # Run task setup.
         try:
@@ -5178,6 +5197,21 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         # Restore original schema
         self.schema = schema_copy
+
+    def _inputs_expected_from_task(self, step, index, in_step, in_index):
+        '''Returns set of inputs expected by step/index from in_step/in_index.
+        If task expects to receive everything, returns None.'''
+        flow = self.get('option', f'flow')
+        in_files = None
+        if len(self.getkeys('flowgraph', flow, step, index, 'file', 'input')) > 0:
+            in_files = set()
+            for filetype in self.getkeys('flowgraph', flow, step, index, 'file', 'input'):
+                for filename in self.getkeys('flowgraph', flow, step, index, 'file', 'input', filetype):
+                    provider_task = self.get('flowgraph', flow, step, index, 'file', 'input', filetype, filename)[0]
+                    if provider_task == (in_step, in_index):
+                        in_files.add(filename)
+
+        return in_files
 
 ###############################################################################
 # Package Customization classes
