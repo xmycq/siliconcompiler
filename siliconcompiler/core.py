@@ -1647,7 +1647,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 for in_step, in_index in self.get('flowgraph', flow, step, index, 'input'):
                     if in_job != self.get('option', 'jobname'):
                         workdir = self._getworkdir(jobname=in_job, step=in_step, index=in_index)
-                        cfg = os.path.join(workdir, 'outputs', f'{design}.pkg.json')
+                        cfg = os.path.join(workdir, 'outputs', f'{design}.pkg.json.gz')
                         if not os.path.isfile(cfg):
                             self.logger.error(f'{step}{index} relies on {in_step}{in_index} '
                                               f'from job {in_job}, but this task has not been run.')
@@ -1848,7 +1848,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                             continue
 
                         design = self.get('design')
-                        manifest = f'{design}.pkg.json'
+                        manifest = f'{design}.pkg.json.gz'
                         inputs = [inp for inp in os.listdir(in_step_out_dir) if inp != manifest]
                     else:
                         inputs = self._gather_outputs(in_step, in_index)
@@ -2469,7 +2469,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         flow = self.get('option', 'flow')
 
         jobdir = self._getworkdir(jobname=job)
-        manifest = os.path.join(jobdir, f'{design}.pkg.json')
+        manifest = os.path.join(jobdir, f'{design}.pkg.json.gz')
         if os.path.isfile(manifest):
             arcname = os.path.relpath(manifest, self.cwd)
             tar.add(manifest, arcname=arcname)
@@ -3663,13 +3663,13 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 in_task_status = status[in_step + in_index]
                 self.set('flowgraph', flow, in_step, in_index, 'status', in_task_status)
                 if in_task_status != TaskStatus.ERROR:
-                    cfgfile = f"../../../{in_job}/{in_step}/{in_index}/outputs/{design}.pkg.json"
+                    cfgfile = f"../../../{in_job}/{in_step}/{in_index}/outputs/{design}.pkg.json.gz"
                     self._read_manifest(cfgfile, clobber=False, partial=True)
 
         ##################
         # Write manifest prior to step running into inputs
 
-        self.write_manifest(f'inputs/{design}.pkg.json')
+        self.write_manifest(os.path.join("inputs", f"{design}.pkg.json.gz"))
 
         ##################
         # Select inputs
@@ -3709,7 +3709,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             if not replay:
                 utils.copytree(f"../../../{in_job}/{in_step}/{in_index}/outputs", 'inputs/',
                                dirs_exist_ok=True,
-                               ignore=[f'{design}.pkg.json'],
+                               ignore=[f'{design}.pkg.json.gz'],
                                link=True)
 
         ##################
@@ -4049,7 +4049,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         # Save a successful manifest
         self.set('flowgraph', flow, step, index, 'status', TaskStatus.SUCCESS)
 
-        self.write_manifest(os.path.join("outputs", f"{design}.pkg.json"))
+        self.write_manifest(os.path.join("outputs", f"{design}.pkg.json.gz"))
 
         ##################
         # Stop if there are errors
@@ -4225,7 +4225,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             all_indices_failed = True
             for index in self.getkeys('flowgraph', flow, step):
                 stepdir = self._getworkdir(step=step, index=index)
-                cfg = f"{stepdir}/outputs/{self.get('design')}.pkg.json"
+                cfg = f"{stepdir}/outputs/{self.get('design')}.pkg.json.gz"
 
                 in_steplist = step in steplist and index in indexlist[step]
                 if not os.path.isdir(stepdir) or (in_steplist and not should_resume):
@@ -4319,7 +4319,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             self._init_logger(in_run=True)
 
             # Read back configuration from final manifest.
-            cfg = os.path.join(self._getworkdir(), f"{self.get('design')}.pkg.json")
+            cfg = os.path.join(self._getworkdir(), f"{self.get('design')}.pkg.json.gz")
             if os.path.isfile(cfg):
                 local_dir = self.get('option', 'builddir')
                 self.read_manifest(cfg, clobber=True, clear=True)
@@ -4338,7 +4338,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                     step_has_cfg = False
                     for index in indexlist[step]:
                         stepdir = self._getworkdir(step=step, index=index)
-                        cfg = f"{stepdir}/outputs/{self.get('design')}.pkg.json"
+                        cfg = f"{stepdir}/outputs/{self.get('design')}.pkg.json.gz"
                         if os.path.isfile(cfg):
                             step_has_cfg = True
                             break
@@ -4483,7 +4483,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
                 os.listdir(os.path.dirname(lastdir))
 
-                lastcfg = f"{lastdir}/outputs/{self.get('design')}.pkg.json"
+                lastcfg = f"{lastdir}/outputs/{self.get('design')}.pkg.json.gz"
                 if status[f'{step}{index}'] == TaskStatus.SUCCESS:
                     self._read_manifest(lastcfg, clobber=False, partial=True)
                 else:
@@ -4501,7 +4501,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         self.schema.record_history()
 
         # Storing manifest in job root directory
-        filepath = os.path.join(self._getworkdir(), f"{self.get('design')}.pkg.json")
+        filepath = os.path.join(self._getworkdir(), f"{self.get('design')}.pkg.json.gz")
         self.write_manifest(filepath)
 
     ###########################################################################
