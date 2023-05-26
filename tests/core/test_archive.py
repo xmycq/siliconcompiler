@@ -13,16 +13,16 @@ def all_files(job):
         f'build/oh_parity/{job}/syn/0/inputs/sc_logiclib_typical.lib',
         f'build/oh_parity/{job}/syn/0/inputs/oh_parity.v',
         f'build/oh_parity/{job}/syn/0/inputs/sc_dff_library.lib',
-        f'build/oh_parity/{job}/syn/0/inputs/oh_parity.pkg.json',
+        f'build/oh_parity/{job}/syn/0/inputs/oh_parity.pkg.json.gz',
         f'build/oh_parity/{job}/syn/0/inputs/sc_abc.constraints',
         f'build/oh_parity/{job}/syn/0/replay.sh',
         f'build/oh_parity/{job}/syn/0/syn.errors',
         f'build/oh_parity/{job}/syn/0/syn.warnings',
-        f'build/oh_parity/{job}/syn/0/outputs/oh_parity.pkg.json',
+        f'build/oh_parity/{job}/syn/0/outputs/oh_parity.pkg.json.gz',
         f'build/oh_parity/{job}/syn/0/outputs/oh_parity.vg',
-        f'build/oh_parity/{job}/oh_parity.pkg.json',
+        f'build/oh_parity/{job}/oh_parity.pkg.json.gz',
         f'build/oh_parity/{job}/import/0/reports/fake.rpt',
-        f'build/oh_parity/{job}/import/0/inputs/oh_parity.pkg.json',
+        f'build/oh_parity/{job}/import/0/inputs/oh_parity.pkg.json.gz',
         f'build/oh_parity/{job}/import/0/import.warnings',
         f'build/oh_parity/{job}/import/0/replay.sh',
         f'build/oh_parity/{job}/import/0/import.errors',
@@ -32,7 +32,7 @@ def all_files(job):
         f'build/oh_parity/{job}/import/0/slpp_all/surelog.log',
         f'build/oh_parity/{job}/import/0/slpp_all/file.lst',
         f'build/oh_parity/{job}/import/0/outputs/oh_parity.v',
-        f'build/oh_parity/{job}/import/0/outputs/oh_parity.pkg.json',
+        f'build/oh_parity/{job}/import/0/outputs/oh_parity.pkg.json.gz',
         f'build/oh_parity/{job}/import/0/import.log',
     ]
 
@@ -59,7 +59,7 @@ def test_archive(chip):
     with tarfile.open('oh_parity_job0.tgz', 'r:gz') as f:
         contents = f.getnames()
 
-    for item in ('build/oh_parity/job0/oh_parity.pkg.json',
+    for item in ('build/oh_parity/job0/oh_parity.pkg.json.gz',
                  'build/oh_parity/job0/import/0/reports',
                  'build/oh_parity/job0/import/0/outputs',
                  'build/oh_parity/job0/import/0/import.log',
@@ -78,7 +78,7 @@ def test_archive_step_index(chip):
     with tarfile.open('oh_parity_job0_import0.tgz', 'r:gz') as f:
         contents = f.getnames()
 
-    for item in ('build/oh_parity/job0/oh_parity.pkg.json',
+    for item in ('build/oh_parity/job0/oh_parity.pkg.json.gz',
                  'build/oh_parity/job0/import/0/reports',
                  'build/oh_parity/job0/import/0/outputs',
                  'build/oh_parity/job0/import/0/import.log'):
@@ -103,23 +103,23 @@ def test_archive_all(chip):
 
 @pytest.mark.quick
 def test_archive_include(chip):
-    chip.archive(include=['*.log', 'reports/*', 'outputs/*.pkg.json'])
+    chip.archive(include=['*.log', 'reports/*', 'outputs/*.pkg.json.gz'])
 
     assert os.path.isfile('oh_parity_job0.tgz')
 
     with tarfile.open('oh_parity_job0.tgz', 'r:gz') as f:
         contents = f.getnames()
 
-    for item in ('build/oh_parity/job0/oh_parity.pkg.json',
+    for item in ('build/oh_parity/job0/oh_parity.pkg.json.gz',
                  'build/oh_parity/job0/import/0/import.log',
-                 'build/oh_parity/job0/import/0/outputs/oh_parity.pkg.json',
+                 'build/oh_parity/job0/import/0/outputs/oh_parity.pkg.json.gz',
                  'build/oh_parity/job0/syn/0/syn.log',
                  'build/oh_parity/job0/syn/0/reports/stat.json',
-                 'build/oh_parity/job0/syn/0/outputs/oh_parity.pkg.json'):
+                 'build/oh_parity/job0/syn/0/outputs/oh_parity.pkg.json.gz'):
         assert item in contents
 
     for item in contents:
-        if not item.endswith('oh_parity.pkg.json'):
+        if not item.endswith('oh_parity.pkg.json.gz'):
             assert 'outputs/' not in item
 
 
@@ -132,6 +132,6 @@ def test_archive_jobs(chip):
     with tarfile.open('oh_parity_job0_job1.tgz') as f:
         contents = f.getnames()
 
-    for item in ('build/oh_parity/job0/oh_parity.pkg.json',
-                 'build/oh_parity/job1/oh_parity.pkg.json'):
+    for item in ('build/oh_parity/job0/oh_parity.pkg.json.gz',
+                 'build/oh_parity/job1/oh_parity.pkg.json.gz'):
         assert item in contents
