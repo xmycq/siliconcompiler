@@ -27,11 +27,11 @@ def test_self_test_cli():
     ''' Verify self-test functionality w/ command-line call '''
     subprocess.run(['sc', '-target', 'asic_demo'])
     assert os.path.isfile('build/heartbeat/job0/export/0/outputs/heartbeat.gds')
-    assert os.path.isfile('build/heartbeat/job0/heartbeat.pkg.json')
+    assert os.path.isfile('build/heartbeat/job0/heartbeat.pkg.json.gz')
 
     # Check timing
     chip = siliconcompiler.Chip('')
-    chip.read_manifest('build/heartbeat/job0/heartbeat.pkg.json')
+    chip.read_manifest('build/heartbeat/job0/heartbeat.pkg.json.gz')
     assert chip.get('metric', 'holdslack', step='export', index='1') >= 0.0
     assert chip.get('metric', 'holdslack', step='export', index='1') < 10.0
     assert chip.get('metric', 'setupslack', step='export', index='1') >= 0.0

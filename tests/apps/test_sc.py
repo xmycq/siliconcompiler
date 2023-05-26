@@ -12,4 +12,4 @@ def test_design_inference(scroot):
     # only run import, makes this quicker
     subprocess.run(['sc', source, '-steplist', 'import', '-strict'])
 
-    assert os.path.isfile('build/heartbeat/job0/heartbeat.pkg.json')
+    assert os.path.isfile('build/heartbeat/job0/heartbeat.pkg.json.gz')

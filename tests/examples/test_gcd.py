@@ -63,7 +63,7 @@ def test_py(setup_example_test):
     import gcd
     gcd.main()
 
-    manifest = 'build/gcd/job0/export/0/outputs/gcd.pkg.json'
+    manifest = 'build/gcd/job0/export/0/outputs/gcd.pkg.json.gz'
     assert os.path.isfile(manifest)
 
     chip = siliconcompiler.Chip('gcd')
@@ -123,7 +123,7 @@ def test_py_sky130(setup_example_test):
 
     assert os.path.isfile('build/gcd/rtl2gds/export/0/outputs/gcd.gds')
 
-    manifest = 'build/gcd/signoff/signoff/0/outputs/gcd.pkg.json'
+    manifest = 'build/gcd/signoff/signoff/0/outputs/gcd.pkg.json.gz'
     assert os.path.isfile(manifest)
 
     chip = siliconcompiler.Chip('gcd')
