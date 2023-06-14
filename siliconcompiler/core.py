@@ -5201,10 +5201,9 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         parameter_map = {}
 
         # Algorithm, search space, and metrics.
-        print('Local SQL database file located at: ', vz_service.VIZIER_DB_PATH)
-        study_config = vz.StudyConfig(algorithm='GAUSSIAN_PROCESS_BANDIT')
+        os.remove(vz_service.VIZIER_DB_PATH)
+        study_config = vz.StudyConfig(algorithm='EAGLE_STRATEGY')
         for param in parameters:
-            print(param)
             key = param['key']
             values = param['values']
             if 'type' in param:
@@ -5270,7 +5269,10 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 self.logger.info(f'Starting optimizer run {n}')
                 self.set('option', 'jobname', f'optimize_{n}')
                 self.set('option', 'quiet', True)
-                self.run()
+                try:
+                    self.run()
+                except Exception:
+                    continue
 
                 measurement = {}
                 for meas_name, meas_key in measurement_map.items():
@@ -5286,11 +5288,13 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
             self.logger.info(f"Optimal Trial Suggestion and Objective {n}:")
             self.logger.info("Suggestion:")
-            for param_name, param_value in optimal_trial.parameters.items():
-                self.logger.info(f"  {parameter_map[param_name]} = {param_value}")
+            trial_parameters = optimal_trial.parameters
+            for param_name, param_key in trial_parameters.items():
+                self.logger.info(f"  {param_key} = {trial_parameters[param_name]}")
             self.logger.info("Objective:")
-            for meas_name, meas_value in optimal_trial.final_measurement.items():
-                self.logger.info(f"  {measurement_map[meas_name]} = {meas_value}")
+            trial_objectives = optimal_trial.final_measurement
+            for meas_name, meas_key in measurement_map.items():
+                self.logger.info(f"  {meas_key} = {trial_objectives[meas_name]}")
 
         study.delete()
 
