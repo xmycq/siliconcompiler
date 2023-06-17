@@ -26,7 +26,9 @@ def main(root='.'):
             {
                 "key": ['tool', 'openroad', 'task', 'place', 'var', 'place_density'],
                 "values": [0.70, 0.95],
-                "type": 'float'
+                "type": 'float',
+                "step": "place",
+                "index": "0"
             },
             {
                 "key": ['tool', 'openroad', 'task', 'cts', 'var', 'cts_cluster_diameter'],
@@ -37,13 +39,18 @@ def main(root='.'):
         [
             {
                 "key": ["metric", "setupslack"],
-                "target": "max"
+                "target": "max",
+                "step": "export",
+                "index": "1"
             },
             # {
             #     "key": ["metric", "holdslack"],
-            #     "target": "max"
+            #     "target": "max",
+            #     "step": "export",
+            #     "index": "1"
             # }
-        ]
+        ],
+        rounds=10
     )
     chip.summary()
 

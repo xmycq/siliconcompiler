@@ -5202,7 +5202,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         # Algorithm, search space, and metrics.
         os.remove(vz_service.VIZIER_DB_PATH)
-        study_config = vz.StudyConfig(algorithm='EAGLE_STRATEGY')
+        study_config = vz.StudyConfig()
         for param in parameters:
             key = param['key']
             values = param['values']
@@ -5259,29 +5259,34 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         for n in range(rounds):
             for suggestion in study.suggest(count=1):
-                save_cfg = self.schema.copy()
+                chip = Chip(self.design)
+                chip.schema = self.schema.copy()
 
                 for param_name, param_value in suggestion.parameters.items():
                     key = parameter_map[param_name]
                     self.logger.info(f'Setting {key} = {param_value}')
-                    self.set(*key, str(param_value))
+                    chip.set(*key, str(param_value), step='place', index='0')
+
+                jobname = f"{self.get('option', 'jobname')}_optimize_{n}"
 
                 self.logger.info(f'Starting optimizer run {n}')
-                self.set('option', 'jobname', f'optimize_{n}')
-                self.set('option', 'quiet', True)
+                chip.set('option', 'jobname', jobname)
+                chip.set('option', 'quiet', True)
+                chip.set('option', 'resume', True)
+
                 try:
-                    self.run()
+                    chip.run()
                 except Exception:
                     continue
 
                 measurement = {}
                 for meas_name, meas_key in measurement_map.items():
-                    measurement[meas_name] = self.get(*meas_key, step='export', index='1')
+                    measurement[meas_name] = chip.get(*meas_key, step='export', index='1')
                     self.logger.info(f'Measured {meas_key} = {measurement[meas_name]}')
 
                 suggestion.complete(vz.Measurement(measurement))
 
-                self.schema = save_cfg
+                self.schema.cfg['history'][jobname] = chip.schema.history(jobname).copy().cfg
 
         for n, optimal_trial in enumerate(study.optimal_trials()):
             optimal_trial = optimal_trial.materialize()
@@ -5290,11 +5295,11 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             self.logger.info("Suggestion:")
             trial_parameters = optimal_trial.parameters
             for param_name, param_key in trial_parameters.items():
-                self.logger.info(f"  {param_key} = {trial_parameters[param_name]}")
+                self.logger.info(f"  {param_name} = {param_key}")
             self.logger.info("Objective:")
             trial_objectives = optimal_trial.final_measurement
-            for meas_name, meas_key in measurement_map.items():
-                self.logger.info(f"  {meas_key} = {trial_objectives[meas_name]}")
+            for meas_name, meas_key in trial_objectives.metrics.items():
+                self.logger.info(f"  {meas_name} = {meas_key.value}")
 
         study.delete()
 
