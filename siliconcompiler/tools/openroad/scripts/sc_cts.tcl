@@ -53,12 +53,15 @@ if {[llength [all_clocks]] > 0} {
     -hold_margin $openroad_rsz_hold_slack_margin \
     -repair_tns $openroad_rsz_repair_tns
 
+  unset_dont_use $sc_cells_hold
+  unset_dont_use $sc_cells_delay
   estimate_parasitics -placement
   puts "Repair hold violations"
   repair_timing -hold \
     -setup_margin $openroad_rsz_setup_slack_margin \
     -hold_margin $openroad_rsz_hold_slack_margin \
     -repair_tns $openroad_rsz_repair_tns
+  set_dont_use $sc_dontuse
 
   detailed_placement -max_displacement $openroad_dpl_max_displacement \
     {*}$dpl_args
