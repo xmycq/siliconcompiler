@@ -11,9 +11,10 @@ try:
 except ModuleNotFoundError:
     __has_vizier = False
 
+
 def _optimize_vizier(chip, parameters, goals, rounds):
     if not __has_vizier:
-        chip.logger.error(f'Vizier is not available')
+        chip.logger.error('Vizier is not available')
         return
 
     parameter_map = {}
@@ -38,19 +39,19 @@ def _optimize_vizier(chip, parameters, goals, rounds):
 
         if key_type == 'float':
             study_config.search_space.root.add_float_param(param_name,
-                                                            values[0], values[1])
+                                                           values[0], values[1])
         elif key_type == 'int':
             study_config.search_space.root.add_int_param(param_name,
-                                                            values[0], values[1])
+                                                         values[0], values[1])
         elif key_type == 'discrete':
             study_config.search_space.root.add_discrete_param(param_name,
-                                                                values)
+                                                              values)
         elif key_type == 'bool':
             study_config.search_space.root.add_discrete_param(param_name,
-                                                                ['true', 'false'])
+                                                              ['true', 'false'])
         elif key_type == 'enum':
             study_config.search_space.root.add_categorical_param(param_name,
-                                                                    values)
+                                                                 values)
         else:
             raise ValueError(f'{key_type} is not supported')
 
@@ -74,8 +75,8 @@ def _optimize_vizier(chip, parameters, goals, rounds):
 
     # Setup client and begin optimization. Vizier Service will be implicitly created.
     study = vz_clients.Study.from_study_config(study_config,
-                                                owner=chip.design,
-                                                study_id=uuid.uuid4().hex)
+                                               owner=chip.design,
+                                               study_id=uuid.uuid4().hex)
 
     for n in range(rounds):
         for suggestion in study.suggest(count=1):
@@ -103,7 +104,7 @@ def _optimize_vizier(chip, parameters, goals, rounds):
             for meas_name, meas_key in measurement_map.items():
                 measurement[meas_name] = chip.get(*meas_key, step='export', index='1')
                 trial_chip.logger.info(f'Measured {meas_key} = {measurement[meas_name]}')
-            
+
             if any([value is None for value in measurement.values()]):
                 suggestion.complete(infeasible_reason="Did not record measurement goal")
             else:

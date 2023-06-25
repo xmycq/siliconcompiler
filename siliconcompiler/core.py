@@ -5206,13 +5206,3 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
     def optimize_parameters(self, parameters, goals, rounds=10):
         optimizer._optimize_vizier(self, parameters, goals, rounds)
-
-
-###############################################################################
-# Package Customization classes
-###############################################################################
-class SiliconCompilerError(Exception):
-    ''' Minimal Exception wrapper used to raise sc runtime errors.
-    '''
-    def __init__(self, message):
-        super(Exception, self).__init__(message)
