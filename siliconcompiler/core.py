@@ -42,13 +42,14 @@ from siliconcompiler import TaskStatus, SiliconCompilerError
 from siliconcompiler.report import _show_summary_table
 from siliconcompiler.report import _generate_summary_image, _open_summary_image
 from siliconcompiler.report import _generate_html_report, _open_html_report
+<<<<<<< HEAD
 from siliconcompiler.report import Dashboard
+=======
+from siliconcompiler.utils import optimizer
+>>>>>>> 3f9cc764 (refactor)
 import psutil
 import subprocess
 import glob
-from vizier.service import clients as vz_clients
-from vizier.service import pyvizier as vz
-from vizier import service as vz_service
 
 
 class Chip:
@@ -5197,111 +5198,14 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         # Restore original schema
         self.schema = schema_copy
 
+    def _copy(self):
+        chip = Chip(self.design)
+        chip.schema = self.schema.copy()
+
+        return chip
+
     def optimize_parameters(self, parameters, goals, rounds=10):
-        parameter_map = {}
-
-        # Algorithm, search space, and metrics.
-        os.remove(vz_service.VIZIER_DB_PATH)
-        study_config = vz.StudyConfig()
-        for param in parameters:
-            key = param['key']
-            values = param['values']
-            if 'type' in param:
-                key_type = param['type']
-            else:
-                key_type = self.get(*key, field='type')
-                if key_type.startswith('['):
-                    key_type = key_type[1:-1]
-
-            param_name = ','.join(key)
-            parameter_map[param_name] = key
-
-            if key_type == 'float':
-                study_config.search_space.root.add_float_param(param_name,
-                                                               values[0], values[1])
-            elif key_type == 'int':
-                study_config.search_space.root.add_int_param(param_name,
-                                                             values[0], values[1])
-            elif key_type == 'discrete':
-                study_config.search_space.root.add_discrete_param(param_name,
-                                                                  values)
-            elif key_type == 'bool':
-                study_config.search_space.root.add_discrete_param(param_name,
-                                                                  ['true', 'false'])
-            elif key_type == 'enum':
-                study_config.search_space.root.add_categorical_param(param_name,
-                                                                     values)
-            else:
-                raise ValueError(f'{key_type} is not supported')
-
-        measurement_map = {}
-        for goal in goals:
-            key = goal['key']
-            target = goal['target']
-
-            goal_name = ','.join(key)
-            measurement_map[goal_name] = key
-
-            vz_goal = None
-            if target == 'max':
-                vz_goal = vz.ObjectiveMetricGoal.MAXIMIZE
-            elif target == 'min':
-                vz_goal = vz.ObjectiveMetricGoal.MINIMIZE
-            else:
-                raise ValueError(f'{target} is not a supported goal')
-
-            study_config.metric_information.append(vz.MetricInformation(goal_name, goal=vz_goal))
-
-        # Setup client and begin optimization. Vizier Service will be implicitly created.
-        study = vz_clients.Study.from_study_config(study_config,
-                                                   owner=self.design,
-                                                   study_id=self.design)
-
-        for n in range(rounds):
-            for suggestion in study.suggest(count=1):
-                chip = Chip(self.design)
-                chip.schema = self.schema.copy()
-
-                for param_name, param_value in suggestion.parameters.items():
-                    key = parameter_map[param_name]
-                    self.logger.info(f'Setting {key} = {param_value}')
-                    chip.set(*key, str(param_value), step='place', index='0')
-
-                jobname = f"{self.get('option', 'jobname')}_optimize_{n}"
-
-                self.logger.info(f'Starting optimizer run {n}')
-                chip.set('option', 'jobname', jobname)
-                chip.set('option', 'quiet', True)
-                chip.set('option', 'resume', True)
-
-                try:
-                    chip.run()
-                except Exception:
-                    continue
-
-                measurement = {}
-                for meas_name, meas_key in measurement_map.items():
-                    measurement[meas_name] = chip.get(*meas_key, step='export', index='1')
-                    self.logger.info(f'Measured {meas_key} = {measurement[meas_name]}')
-
-                suggestion.complete(vz.Measurement(measurement))
-
-                self.schema.cfg['history'][jobname] = chip.schema.history(jobname).copy().cfg
-
-        for n, optimal_trial in enumerate(study.optimal_trials()):
-            optimal_trial = optimal_trial.materialize()
-
-            self.logger.info(f"Optimal Trial Suggestion and Objective {n}:")
-            self.logger.info("Suggestion:")
-            trial_parameters = optimal_trial.parameters
-            for param_name, param_key in trial_parameters.items():
-                self.logger.info(f"  {param_name} = {param_key}")
-            self.logger.info("Objective:")
-            trial_objectives = optimal_trial.final_measurement
-            for meas_name, meas_key in trial_objectives.metrics.items():
-                self.logger.info(f"  {meas_name} = {meas_key.value}")
-
-        study.delete()
+        optimizer._optimize_vizier(self, parameters, goals, rounds)
 
 
 ###############################################################################
