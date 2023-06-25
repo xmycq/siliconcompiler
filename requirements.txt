@@ -22,7 +22,7 @@ Pillow >= 8.4.0
 GitPython >= 3.1.0
 
 # Version specific
-#:python_version>="3.7"
+#::python_version >= "3.7"
 google-vizier[jax]
 
 # Report
