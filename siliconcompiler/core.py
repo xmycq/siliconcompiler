@@ -5204,5 +5204,9 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         return chip
 
-    def optimize_parameters(self, parameters, goals, rounds=10):
-        optimizer._optimize_vizier(self, parameters, goals, rounds)
+    def optimize_parameters(self, parameters, goals, experiments=None, parallel_limit=1):
+        optimizer._optimize_vizier(self,
+                                   parameters,
+                                   goals,
+                                   experiments,
+                                   parallel_limit=parallel_limit)

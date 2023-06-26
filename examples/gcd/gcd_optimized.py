@@ -18,11 +18,13 @@ def main(root='.'):
     chip.set('option', 'skipcheck', True)
     chip.set('option', 'novercheck', True)
     chip.set('option', 'nodisplay', True)
-    chip.set('constraint', 'outline', [(0, 0), (100.13, 100.8)])
-    chip.set('constraint', 'corearea', [(10.07, 11.2), (90.25, 91)])
     chip.load_target("skywater130_demo")
     chip.optimize_parameters(
         [
+            {
+                "key": ['constraint', 'density'],
+                "values": [10, 40],
+            },
             {
                 "key": ['tool', 'openroad', 'task', 'place', 'var', 'place_density'],
                 "values": [0.70, 0.95],
@@ -50,7 +52,7 @@ def main(root='.'):
             #     "index": "1"
             # }
         ],
-        rounds=10
+        experiments=10
     )
     chip.summary()
 
