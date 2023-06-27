@@ -1,6 +1,8 @@
 import logging
 import uuid
 import math
+import os
+import multiprocessing
 
 try:
     from vizier.service import clients as vz_clients
@@ -110,7 +112,7 @@ def __add_vizier_measurement(metric_information, goals):
     return measurement_map
 
 
-def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=1):
+def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
     if not __has_vizier:
         chip.logger.error('Vizier is not available')
         return
@@ -129,10 +131,15 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=1):
                                                owner=chip.design,
                                                study_id=uuid.uuid4().hex)
 
+    if not parallel_limit:
+        parallel_limit = 1
+
     if not chip.get('option', 'remote'):
         parallel_limit = 1
 
     rounds = int(math.ceil(float(experiments) / parallel_limit))
+
+    multiprocessor = multiprocessing.get_context('spawn')
 
     for n in range(rounds):
         trial_chips = {}
@@ -143,7 +150,8 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=1):
             trial_chips[m] = {
                 "chip": trial_chip,
                 "failed": None,
-                "run": None
+                "run": multiprocessor.Process(target=trial_chip.run),
+                "suggestion": suggestion
             }
 
             jobname = f"{chip.get('option', 'jobname')}_optimize_{n+1}_{m+1}"
@@ -157,16 +165,25 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=1):
 
             trial_chip.set('option', 'jobname', jobname)
             trial_chip.set('option', 'quiet', True)
-            # trial_chip.set('option', 'resume', True
 
+        # Start run
         for trial_entry in trial_chips.values():
             trial_chip = trial_entry['chip']
-
+            trial_runner = trial_entry['run']
             chip.logger.info(f"Starting optimizer run ({trial_chip.get('option', 'jobname')})")
-            try:
-                trial_chip.run()
-            except Exception as e:
-                trial_entry['failed'] = f"{e}"
+            trial_runner.start()
+
+        # Wait for them to finish
+        for trial_entry in trial_chips.values():
+            trial_entry['run'].join()
+
+        # Record results
+        for trial_entry in trial_chips.values():
+            trial_chip = trial_entry['chip']
+            trial_suggestion = trial_entry['suggestion']
+            # Read back the final manifest
+            trial_chip.read_manifest(
+                os.path.join(trial_chip._getworkdir(), f'{trial_chip.design}.pkg.json'))
 
             measurement = {}
             for meas_name, meas_entry in measurement_map.items():
@@ -180,10 +197,10 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=1):
 
             if trial_entry['failed']:
                 chip.logger.error(f'{jobname} failed: {trial_entry["failed"]}')
-                suggestion.complete(vz.Measurement(),
-                                    infeasible_reason=trial_entry['failed'])
+                trial_suggestion.complete(vz.Measurement(),
+                                          infeasible_reason=trial_entry['failed'])
             else:
-                suggestion.complete(vz.Measurement(measurement))
+                trial_suggestion.complete(vz.Measurement(measurement))
             chip.schema.cfg['history'][jobname] = trial_chip.schema.history(jobname).cfg
 
     optimal_trials = list(study.optimal_trials())
