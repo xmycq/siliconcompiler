@@ -162,7 +162,7 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
             for step, index in trial_chip._get_flowgraph_entry_nodes(flow=org_flow):
                 trial_chip.edge(flow, 'start', f'{graph_name}.{step}', head_index=index)
             for step, index in trial_chip._get_flowgraph_exit_nodes(flow=org_flow):
-                trial_chip.edge(flow, f'{graph_name}.{step}', 'end', head_index=index)
+                trial_chip.edge(flow, f'{graph_name}.{step}', 'end', tail_index=index)
 
         # Setup each experiment
         for m, suggestion in enumerate(study.suggest(count=parallel_limit)):
@@ -183,7 +183,8 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
         try:
             trial_chip.logger.info(f"Starting optimizer run ({jobname})")
             trial_chip.run()
-        except Exception:
+        except Exception as e:
+            print(e)
             pass
 
         chip.schema.cfg['history'][jobname] = trial_chip.schema.history(jobname).cfg
