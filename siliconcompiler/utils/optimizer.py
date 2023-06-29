@@ -150,6 +150,7 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
         jobname = f"{flow}_{n+1}"
         # Create new graph
         trial_chip.node(flow, 'start', nop)
+        trial_chip.node(flow, 'end', nop)
         for m in range(parallel_limit):
             graph_name = f'{m+1}'
             flow_map[m] = {
@@ -160,6 +161,8 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
 
             for step, index in trial_chip._get_flowgraph_entry_nodes(flow=org_flow):
                 trial_chip.edge(flow, 'start', f'{graph_name}.{step}', head_index=index)
+            for step, index in trial_chip._get_flowgraph_exit_nodes(flow=org_flow):
+                trial_chip.edge(flow, f'{graph_name}.{step}', 'end', head_index=index)
 
         # Setup each experiment
         for m, suggestion in enumerate(study.suggest(count=parallel_limit)):
