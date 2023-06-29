@@ -3,6 +3,7 @@ import uuid
 import math
 import os
 import multiprocessing
+from siliconcompiler.tools.builtin import nop
 
 try:
     from vizier.service import clients as vz_clients
@@ -134,74 +135,80 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
     if not parallel_limit:
         parallel_limit = 1
 
-    if not chip.get('option', 'remote'):
-        parallel_limit = 1
+    # if not chip.get('option', 'remote'):
+    #     parallel_limit = 1
 
     rounds = int(math.ceil(float(experiments) / parallel_limit))
 
-    multiprocessor = multiprocessing.get_context('spawn')
-
+    org_flow = chip.get("option", "flow")
+    org_jobname = chip.get("option", "jobname")
     for n in range(rounds):
-        trial_chips = {}
+        trial_chip = chip._copy()
+        flow_map = {}
+
+        flow = f'optimize_{org_flow}'
+        jobname = f"{flow}_{n+1}"
+        # Create new graph
+        trial_chip.node(flow, 'start', nop)
+        for m in range(parallel_limit):
+            graph_name = f'{m+1}'
+            flow_map[m] = {
+                "opt_name": f'{jobname}/{graph_name}',
+                "name": graph_name
+            }
+            trial_chip.graph(flow, org_flow, name=graph_name)
+
+            for step, index in trial_chip._get_flowgraph_entry_nodes(flow=org_flow):
+                trial_chip.edge(flow, 'start', f'{graph_name}.{step}', head_index=index)
 
         # Setup each experiment
         for m, suggestion in enumerate(study.suggest(count=parallel_limit)):
-            trial_chip = chip._copy()
-            trial_chips[m] = {
-                "chip": trial_chip,
-                "failed": None,
-                "run": multiprocessor.Process(target=trial_chip.run),
-                "suggestion": suggestion
-            }
-
-            jobname = f"{chip.get('option', 'jobname')}_optimize_{n+1}_{m+1}"
-
-            chip.logger.info(f'Setting parameters for {jobname}')
+            trial_chip.logger.info(f'Setting parameters for {flow_map[m]["opt_name"]}')
+            flow_map[m]["suggestion"] = suggestion
             for param_name, param_value in suggestion.parameters.items():
                 param_entry = parameter_map[param_name]
-                chip.logger.info(f'Setting {param_entry["print"]} = {param_value}')
+                trial_chip.logger.info(f'  Setting {param_entry["print"]} = {param_value}')
                 trial_chip.set(*param_entry["key"], str(param_value),
-                               step=param_entry["step"], index=param_entry["index"])
+                         step=f'{flow_map[m]["name"]}.{param_entry["step"]}',
+                         index=param_entry["index"])
 
-            trial_chip.set('option', 'jobname', jobname)
-            trial_chip.set('option', 'quiet', True)
+        trial_chip.set('option', 'jobname', jobname)
+        trial_chip.set('option', 'flow', flow)
+        trial_chip.set('option', 'quiet', True)
 
         # Start run
-        for trial_entry in trial_chips.values():
-            trial_chip = trial_entry['chip']
-            trial_runner = trial_entry['run']
-            chip.logger.info(f"Starting optimizer run ({trial_chip.get('option', 'jobname')})")
-            trial_runner.start()
+        try:
+            trial_chip.logger.info(f"Starting optimizer run ({jobname})")
+            trial_chip.run()
+        except Exception:
+            pass
 
-        # Wait for them to finish
-        for trial_entry in trial_chips.values():
-            trial_entry['run'].join()
+        chip.schema.cfg['history'][jobname] = trial_chip.schema.history(jobname).cfg
 
         # Record results
-        for trial_entry in trial_chips.values():
-            trial_chip = trial_entry['chip']
+        for trial_entry in flow_map.values():
+            trial_name = trial_entry['name']
             trial_suggestion = trial_entry['suggestion']
-            # Read back the final manifest
-            trial_chip.read_manifest(
-                os.path.join(trial_chip._getworkdir(), f'{trial_chip.design}.pkg.json'))
+            trial_opt_name = trial_entry['opt_name']
 
             measurement = {}
+            trial_chip.logger.info(f'Measuring {trial_opt_name}')
             for meas_name, meas_entry in measurement_map.items():
                 measurement[meas_name] = trial_chip.get(
                     *meas_entry["key"],
-                    step=meas_entry["step"], index=meas_entry["index"])
-                trial_chip.logger.info(f'Measured {meas_entry["print"]} = {measurement[meas_name]}')
+                    step=f'{trial_name}.{meas_entry["step"]}', index=meas_entry["index"])
+                trial_chip.logger.info(f'  Measured {meas_entry["print"]} = {measurement[meas_name]}')
 
+            failed = None
             if any([value is None for value in measurement.values()]):
-                trial_entry['failed'] = "Did not record measurement goal"
+                failed = "Did not record measurement goal"
 
-            if trial_entry['failed']:
-                chip.logger.error(f'{jobname} failed: {trial_entry["failed"]}')
+            if failed:
+                trial_chip.logger.error(f'{trial_opt_name} failed: {failed}')
                 trial_suggestion.complete(vz.Measurement(),
-                                          infeasible_reason=trial_entry['failed'])
+                                          infeasible_reason=failed)
             else:
                 trial_suggestion.complete(vz.Measurement(measurement))
-            chip.schema.cfg['history'][jobname] = trial_chip.schema.history(jobname).cfg
 
     optimal_trials = list(study.optimal_trials())
     for n, optimal_trial in enumerate(optimal_trials):
