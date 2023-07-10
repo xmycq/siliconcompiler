@@ -194,11 +194,19 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
             trial_name = trial_entry['name']
             trial_suggestion = trial_entry['suggestion']
             trial_opt_name = trial_entry['opt_name']
+            meas_chip = trial_chip._copy()
+            manifest = trial_chip._getworkdir(
+                    step=f"{trial_entry['name']}.export",
+                    index='1') + f'/outputs/{trial_chip.design}.pkg.json'
+            if os.path.exists(manifest):
+                meas_chip.read_manifest(manifest)
+            else:
+                chip.logger.warn(f'{manifest} is missing')
 
             measurement = {}
             trial_chip.logger.info(f'Measuring {trial_opt_name}')
             for meas_name, meas_entry in measurement_map.items():
-                measurement[meas_name] = trial_chip.get(
+                measurement[meas_name] = meas_chip.get(
                     *meas_entry["key"],
                     step=f'{trial_name}.{meas_entry["step"]}', index=meas_entry["index"])
                 trial_chip.logger.info(f'  Measured {meas_entry["print"]} = {measurement[meas_name]}')
