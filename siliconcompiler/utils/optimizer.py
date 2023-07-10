@@ -2,7 +2,6 @@ import logging
 import uuid
 import math
 import os
-import multiprocessing
 from siliconcompiler.tools.builtin import nop
 
 try:
@@ -135,9 +134,6 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
     if not parallel_limit:
         parallel_limit = 1
 
-    # if not chip.get('option', 'remote'):
-    #     parallel_limit = 1
-
     rounds = int(math.ceil(float(experiments) / parallel_limit))
 
     org_flow = chip.get("option", "flow")
@@ -147,7 +143,7 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
         flow_map = {}
 
         flow = f'optimize_{org_flow}'
-        jobname = f"{flow}_{n+1}"
+        jobname = f"{flow}-{org_jobname}_{n+1}"
         # Create new graph
         trial_chip.node(flow, 'start', nop)
         trial_chip.node(flow, 'end', nop)
@@ -172,8 +168,8 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
                 param_entry = parameter_map[param_name]
                 trial_chip.logger.info(f'  Setting {param_entry["print"]} = {param_value}')
                 trial_chip.set(*param_entry["key"], str(param_value),
-                         step=f'{flow_map[m]["name"]}.{param_entry["step"]}',
-                         index=param_entry["index"])
+                               step=f'{flow_map[m]["name"]}.{param_entry["step"]}',
+                               index=param_entry["index"])
 
         trial_chip.set('option', 'jobname', jobname)
         trial_chip.set('option', 'flow', flow)
@@ -195,9 +191,8 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
             trial_suggestion = trial_entry['suggestion']
             trial_opt_name = trial_entry['opt_name']
             meas_chip = trial_chip._copy()
-            manifest = trial_chip._getworkdir(
-                    step=f"{trial_entry['name']}.export",
-                    index='1') + f'/outputs/{trial_chip.design}.pkg.json'
+            manifest = trial_chip._getworkdir(step=f"{trial_entry['name']}.export", index='1') + \
+                f'/outputs/{trial_chip.design}.pkg.json'
             if os.path.exists(manifest):
                 meas_chip.read_manifest(manifest)
             else:
@@ -209,7 +204,8 @@ def _optimize_vizier(chip, parameters, goals, experiments, parallel_limit=None):
                 measurement[meas_name] = meas_chip.get(
                     *meas_entry["key"],
                     step=f'{trial_name}.{meas_entry["step"]}', index=meas_entry["index"])
-                trial_chip.logger.info(f'  Measured {meas_entry["print"]} = {measurement[meas_name]}')
+                trial_chip.logger.info(f'  Measured {meas_entry["print"]} = '
+                                       f'{measurement[meas_name]}')
 
             failed = None
             if any([value is None for value in measurement.values()]):

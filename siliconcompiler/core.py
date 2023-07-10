@@ -42,11 +42,8 @@ from siliconcompiler import TaskStatus, SiliconCompilerError
 from siliconcompiler.report import _show_summary_table
 from siliconcompiler.report import _generate_summary_image, _open_summary_image
 from siliconcompiler.report import _generate_html_report, _open_html_report
-<<<<<<< HEAD
 from siliconcompiler.report import Dashboard
-=======
 from siliconcompiler.utils import optimizer
->>>>>>> 3f9cc764 (refactor)
 import psutil
 import subprocess
 import glob
