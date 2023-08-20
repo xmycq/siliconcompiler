@@ -270,13 +270,14 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             log_format.append('%(lineno)-4s')
 
         if in_run:
-
             # Figure out how wide to make step and index fields
             max_step_len = 1
             max_index_len = 1
-            for future_step, future_index in self.nodes_to_execute():
-                max_step_len = max(len(future_step), max_step_len)
-                max_index_len = max(len(future_index), max_index_len)
+            flow = self.get('option', 'flow')
+            for future_step in self.getkeys('flowgraph', flow):
+                for future_index in self.getkeys('flowgraph', flow, future_step):
+                    max_step_len = max(len(future_step), max_step_len)
+                    max_index_len = max(len(future_index), max_index_len)
 
             jobname = self.get('option', 'jobname')
 
@@ -1306,21 +1307,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         return schema
 
     ###########################################################################
-    def _key_may_be_updated(self, keypath):
-        '''Helper that returns whether `keypath` can be updated mid-run.'''
-        # TODO: cleaner way to manage this?
-        if keypath[0] in ('metric', 'record'):
-            return True
-        if keypath[0] == 'flowgraph' and keypath[4] in ('select', 'status'):
-            return True
-        if keypath[0] == 'tool':
-            return True
-        if self.get(*keypath, field='type') in ['file', '[file]']:
-            return True
-        return False
-
-    ###########################################################################
-    def _merge_manifest(self, src, job=None, clobber=True, clear=True, check=False, partial=False):
+    def _merge_manifest(self, src, job=None, clobber=True, clear=True, check=False):
         """
         Merges a given manifest with the current compilation manifest.
 
@@ -1334,8 +1321,6 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             clear (bool): If True, disables append operations for list type
             clobber (bool): If True, overwrites existing parameter value
             check (bool): If True, checks the validity of each key
-            partial (bool): If True, perform a partial merge, only merging
-                keypaths that may have been updated during run().
         """
         if job is not None:
             dest = self.schema.history(job)
@@ -1344,8 +1329,6 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         for keylist in src.allkeys():
             if keylist[0] in ('history', 'library'):
-                continue
-            if partial and not self._key_may_be_updated(keylist):
                 continue
             # only read in valid keypaths without 'default'
             key_valid = True
@@ -1791,8 +1774,12 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         # Read from file into new schema object
         schema = Schema(manifest=filename, logger=self.logger)
 
+        if partial:
+            self.schema._import_journal(schema)
+            return
+
         # Merge data in schema with Chip configuration
-        self._merge_manifest(schema, job=job, clear=clear, clobber=clobber, partial=partial)
+        self._merge_manifest(schema, job=job, clear=clear, clobber=clobber)
 
         # Read history, if we're not already reading into a job
         if 'history' in schema.getkeys() and not partial and not job:
@@ -1800,8 +1787,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 self._merge_manifest(schema.history(historic_job),
                                      job=historic_job,
                                      clear=clear,
-                                     clobber=clobber,
-                                     partial=False)
+                                     clobber=clobber)
 
         # TODO: better way to handle this?
         if 'library' in schema.getkeys() and not partial:
@@ -2998,23 +2984,6 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         os.makedirs(os.path.join(workdir, 'reports'), exist_ok=True)
         return workdir
 
-    def _merge_input_dependencies_manifests(self, step, index, status, replay):
-        '''
-        Merge manifests from all input dependencies
-        '''
-
-        design = self.get('design')
-        flow = self.get('option', 'flow')
-        in_job = self._get_in_job(step, index)
-
-        if not self.get('option', 'remote') and not replay:
-            for in_step, in_index in self._get_flowgraph_node_inputs(flow, (step, index)):
-                in_node_status = status[(in_step, in_index)]
-                self.set('flowgraph', flow, in_step, in_index, 'status', in_node_status)
-                cfgfile = f"../../../{in_job}/{in_step}/{in_index}/outputs/{design}.pkg.json"
-                if os.path.isfile(cfgfile):
-                    self._read_manifest(cfgfile, clobber=False, partial=True)
-
     def _select_inputs(self, step, index):
 
         flow = self.get('option', 'flow')
@@ -3377,8 +3346,6 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                         self.hash_files(*args, step=step, index=index)
 
     def _setupnode(self, flow, step, index, status, replay):
-        self._merge_input_dependencies_manifests(step, index, status, replay)
-
         # Write manifest prior to step running into inputs
         self.set('arg', 'step', step, clobber=True)
         self.set('arg', 'index', index, clobber=True)
@@ -3408,6 +3375,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         '''
 
         self._init_logger(step, index, in_run=True)
+        self.schema._start_journal()
 
         # Make record of sc version and machine
         self.__record_version(step, index)
@@ -3439,6 +3407,7 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         # return to original directory
         os.chdir(cwd)
+        self.schema._stop_journal()
 
     def _executenode(self, step, index):
         workdir = self._getworkdir(step=step, index=index)
@@ -3603,8 +3572,6 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 schema = Schema(manifest=lastcfg)
                 if schema.get('flowgraph', flow, step, index, 'status') == NodeStatus.SUCCESS:
                     stat_success = True
-            if os.path.isfile(lastcfg):
-                self._read_manifest(lastcfg, clobber=False, partial=True)
             if stat_success:
                 # (Status doesn't get propagated w/ "clobber=False")
                 self.set('flowgraph', flow, step, index, 'status', NodeStatus.SUCCESS)
@@ -3758,6 +3725,8 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         running_nodes = []
         deps_was_successful = {}
         while len(nodes_to_run) > 0 or len(running_nodes) > 0:
+            self._process_completed_nodes(processes, running_nodes, status)
+
             # Check for new nodes that can be launched.
             for node, deps in list(nodes_to_run.items()):
                 # TODO: breakpoint logic:
@@ -3784,19 +3753,28 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
                 self.error('Nodes left to run, but no '
                            'running nodes. From/to may be invalid.', fatal=True)
 
-            # Check for completed nodes.
-            # TODO: consider staying in this section of loop until a node
-            # actually completes.
-            for node in running_nodes.copy():
-                if not processes[node].is_alive():
-                    running_nodes.remove(node)
-                    if processes[node].exitcode > 0:
-                        status[node] = NodeStatus.ERROR
-                    else:
-                        status[node] = NodeStatus.SUCCESS
-
             # TODO: exponential back-off with max?
             time.sleep(0.1)
+
+    def _process_completed_nodes(self, processes, running_nodes, status):
+        for node in running_nodes.copy():
+            if not processes[node].is_alive():
+                step, index = node
+                manifest = os.path.join(self._getworkdir(step=step, index=index),
+                                        'outputs',
+                                        f'{self.design}.pkg.json')
+                self.logger.debug(f'{step}{index} is complete merging: {manifest}')
+                if os.path.exists(manifest):
+                    self._read_manifest(manifest, partial=True)
+
+                running_nodes.remove(node)
+                if processes[node].exitcode > 0:
+                    status[node] = NodeStatus.ERROR
+                else:
+                    status[node] = NodeStatus.SUCCESS
+
+                self.set('flowgraph', self.get('option', 'flow'), step, index, 'status',
+                         status[node])
 
     def _check_nodes_status(self, flow, status):
         def success(node):
@@ -3809,8 +3787,9 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
         # On success, write out status dict to flowgraph status. We do this
         # since certain scenarios won't be caught by reading in manifests (a
         # failing step doesn't dump a manifest). For example, if the
-        # final steps have two indices and one fails.
-        for (step, index) in self.nodes_to_execute(flow):
+        # steplist's final step has two indices and one fails.
+        flowgraph_nodes = self._get_flowgraph_nodes(flow)
+        for (step, index) in flowgraph_nodes:
             node = (step, index)
             if status[node] != NodeStatus.PENDING:
                 self.set('flowgraph', flow, step, index, 'status', status[node])
