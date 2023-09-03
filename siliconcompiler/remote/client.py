@@ -593,16 +593,12 @@ def fetch_results(chip, node, results_path=None):
     try:
         with tarfile.open(results_path, 'r:gz') as tar:
             tar.extractall(path=(node if node else ''))
-    except (tarfile.EmptyHeaderError, tarfile.ReadError):
-        # Likely that the server returned an empty response.
-        # This can be benign, for example if nonessential tasks
-        # fail to complete in a parallel flowgraph.
-        chip.logger.warning(f'Server did not return results for task {node}.')
+    except tarfile.TarError as e:
+        chip.error(f'Failed to extract data from {results_path}: {e}')
         return
     finally:
         # Remove the results archive after it is extracted.
-        if os.path.isfile(results_path):
-            os.remove(results_path)
+        os.remove(results_path)
 
     # Remove dangling symlinks if necessary.
     for import_link in glob.iglob(job_hash + '/' + top_design + '/**/*',
