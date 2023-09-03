@@ -11,9 +11,9 @@ import tarfile
 import tempfile
 import multiprocessing
 
+from siliconcompiler import utils, SiliconCompilerError
 from siliconcompiler._metadata import default_server
-from siliconcompiler import utils
-from siliconcompiler import SiliconCompilerError
+from siliconcompiler.schema import Schema
 
 
 # Client / server timeout
@@ -111,7 +111,7 @@ def __build_post_params(chip, job_name=None, job_hash=None):
 
 
 ###################################
-def remote_preprocess(chip, steplist):
+def _remote_preprocess(chip, steplist):
     '''
     Helper method to run a local import stage for remote jobs.
     '''
@@ -120,22 +120,39 @@ def remote_preprocess(chip, steplist):
     flow = chip.get('option', 'flow')
     remote_steplist = steplist.copy()
     entry_steps = chip._get_flowgraph_entry_nodes(flow=flow)
-    # Determine whether entry steps have run successfully.
-    entry_success = True
-    for task_tuple in entry_steps:
-        step, index = task_tuple[0], task_tuple[1]
-        # Status values will have been set by SC if ('option', 'resume') is set.
-        if not chip.get('flowgraph', flow, step, index, 'status'):
-            entry_success = False
-            break
-    # If 'resume' is set, and the entry steps have completed, no action is needed.
-    # Otherwise, proceed to run entry steps and set the flowgraph to run the whole job.
-    if not (chip.get('option', 'resume') and entry_success):
-        if any([step not in remote_steplist for step, _ in entry_steps]) \
-           or (len(remote_steplist) == 1):
-            chip.error('Remote flows must be organized such that the starting task(s) are '
-                       'run before all other steps, and at least one other task is included.\n'
-                       f'Full steplist: {remote_steplist}\nStarting steps: {entry_steps}',
+    if any([step not in remote_steplist for step, _ in entry_steps]) or (len(remote_steplist) == 1):
+        chip.error('Remote flows must be organized such that the starting task(s) are run before '
+                   'all other steps, and at least one other task is included.\n'
+                   f'Full steplist: {remote_steplist}\nStarting steps: {entry_steps}',
+                   fatal=True)
+    # Setup up tools for all local functions
+    for local_step, index in entry_steps:
+        tool = chip.get('flowgraph', flow, local_step, index, 'tool')
+        task = chip._get_task(local_step, index)
+        # Setting up tool is optional (step may be a builtin function)
+        if not chip._is_builtin(tool, task):
+            chip._setup_node(local_step, index)
+
+        # Remove each local step from the list of steps to run on the server side.
+        remote_steplist.remove(local_step)
+
+        # Need to override steplist here to make sure check_manifest() doesn't
+        # check steps that haven't been setup.
+        chip.set('option', 'steplist', local_step)
+
+        # Run the actual import step locally with multiprocess as _runtask must
+        # be run in a separate thread.
+        # We can pass in an empty 'status' dictionary, since _runtask() will
+        # only look up a step's dependencies in this dictionary, and the first
+        # step should have none.
+        run_task = multiprocessor.Process(target=chip._runtask,
+                                          args=(local_step, index, {}))
+        run_task.start()
+        run_task.join()
+        if run_task.exitcode != 0:
+            # A 'None' or nonzero value indicates that the Process target failed.
+            ftask = f'{local_step}{index}'
+            chip.error(f"Could not start remote job: local setup task {ftask} failed.",
                        fatal=True)
         # Setup up tools for all local functions
         for local_step, index in entry_steps:
@@ -258,8 +275,71 @@ def _process_progress_info(chip, progress_info, nodes_to_print=3):
     return completed
 
 
+def _load_remote_config(chip):
+    '''
+    Load the remote storage config into the status dictionary.
+    '''
+    if chip.get('option', 'credentials'):
+        # Use the provided remote credentials file.
+        cfg_file = os.path.abspath(chip.get('option', 'credentials'))
+
+        if not os.path.isfile(cfg_file):
+            # Check if it's a file since its been requested by the user
+            chip.error(f'Unable to find the credentials file: {cfg_file}', fatal=True)
+    else:
+        # Use the default config file path.
+        cfg_file = utils.default_credentials_file()
+
+    cfg_dir = os.path.dirname(cfg_file)
+    if os.path.isdir(cfg_dir) and os.path.isfile(cfg_file):
+        chip.logger.info(f'Using credentials: {cfg_file}')
+        with open(cfg_file, 'r') as cfgf:
+            chip.status['remote_cfg'] = json.loads(cfgf.read())
+    else:
+        chip.logger.warning('Could not find remote server configuration: '
+                            f'defaulting to {default_server}')
+        chip.status['remote_cfg'] = {
+            "address": default_server
+        }
+    if ('address' not in chip.status['remote_cfg']):
+        chip.error('Improperly formatted remote server configuration - '
+                   'please run "sc-configure" and enter your server address and '
+                   'credentials.', fatal=True)
+
+
+def remote_process(chip, steplist):
+    '''
+    Dispatch the Chip to a remote server for processing.
+    '''
+    _load_remote_config(chip)
+
+    # Pre-process: Run an starting nodes locally, and upload the
+    # in-progress build directory to the remote server.
+    # Data is encrypted if user / key were specified.
+    # run remote process
+    if chip.get('arg', 'step'):
+        chip.error('Cannot pass "-step" parameter into remote flow.', fatal=True)
+    cur_steplist = chip.get('option', 'steplist')
+    pre_remote_steplist = {
+        'steplist': cur_steplist,
+        'set': chip.schema._is_set(chip.schema._search('option', 'steplist')),
+    }
+    _remote_preprocess(chip, steplist)
+
+    # Run the job on the remote server, and wait for it to finish.
+    # Set logger to indicate remote run
+    chip._init_logger(step='remote', index='0', in_run=True)
+    _remote_run(chip)
+
+    # Restore logger
+    chip._init_logger(in_run=True)
+    # Restore steplist
+    if pre_remote_steplist['set']:
+        chip.set('option', 'steplist', pre_remote_steplist['steplist'])
+
+
 ###################################
-def remote_run(chip):
+def _remote_run(chip):
     '''
     Helper method to run a job stage on a remote compute cluster.
     Note that files will not be copied to the remote stage; typically
@@ -273,7 +353,7 @@ def remote_run(chip):
     '''
 
     # Ask the remote server to start processing the requested step.
-    request_remote_run(chip)
+    _request_remote_run(chip)
 
     # Remove the local 'import.tar.gz' archive.
     local_archive = os.path.join(chip._getworkdir(),
@@ -291,14 +371,13 @@ def remote_run_loop(chip):
     try:
         __remote_run_loop(chip)
     except KeyboardInterrupt:
-        jobid = chip.status['jobhash']
         entry_step, entry_index = \
             chip._get_flowgraph_entry_nodes(flow=chip.get('option', 'flow'))[0]
         entry_manifest = os.path.join(chip._getworkdir(step=entry_step, index=entry_index),
                                       'outputs',
                                       f'{chip.design}.pkg.json')
-        reconnect_cmd = f'sc-remote -jobid {jobid} -cfg {entry_manifest} -reconnect'
-        cancel_cmd = f'sc-remote -jobid {jobid} -cancel'
+        reconnect_cmd = f'sc-remote -cfg {entry_manifest} -reconnect'
+        cancel_cmd = f'sc-remote -cfg {entry_manifest} -cancel'
         chip.logger.info('Disconnecting from remote job')
         chip.logger.info(f'To reconnect to this job use: {reconnect_cmd}')
         chip.logger.info(f'To cancel this job use: {cancel_cmd}')
@@ -368,7 +447,28 @@ def check_progress(chip):
 
 
 ###################################
-def request_remote_run(chip):
+def _update_entry_manifests(chip):
+    '''
+    Helper method to update locally-run manifests to include remote job ID.
+    '''
+
+    flow = chip.get('option', 'flow')
+    jobid = chip.get('record', 'remoteid')
+    design = chip.get('design')
+
+    entry_nodes = chip._get_flowgraph_entry_nodes(flow=flow)
+    for step, index in entry_nodes:
+        manifest_path = os.path.join(chip._getworkdir(step=step, index=index),
+                                     'outputs',
+                                     f'{design}.pkg.json')
+        tmp_schema = Schema(manifest=manifest_path)
+        tmp_schema.set('record', 'remoteid', jobid)
+        with open(manifest_path, 'w') as new_manifest:
+            tmp_schema.write_json(new_manifest)
+
+
+###################################
+def _request_remote_run(chip):
     '''
     Helper method to make a web request to start a job stage.
     '''
@@ -403,7 +503,8 @@ def request_remote_run(chip):
     # part of the HTTP spec, so we need to manually follow the trail.
     post_params = {
         'chip_cfg': chip.schema.cfg,
-        'params': __build_post_params(chip)
+        'params': __build_post_params(chip,
+                                      job_hash=chip.get('record', 'remoteid'))
     }
 
     def post_action(url):
@@ -421,8 +522,9 @@ def request_remote_run(chip):
 
     if 'message' in resp and resp['message']:
         chip.logger.info(resp['message'])
-    chip.status['jobhash'] = resp['job_hash']
-    chip.logger.info(f"Your job's reference ID is: {chip.status['jobhash']}")
+    chip.set('record', 'remoteid', resp['job_hash'])
+    _update_entry_manifests(chip)
+    chip.logger.info(f"Your job's reference ID is: {resp['job_hash']}")
 
 
 ###################################
@@ -436,7 +538,7 @@ def is_job_busy(chip):
     # Make the request and print its response.
     def post_action(url):
         params = __build_post_params(chip,
-                                     job_hash=chip.status['jobhash'],
+                                     job_hash=chip.get('record', 'remoteid'),
                                      job_name=chip.get('option', 'jobname'))
         return requests.post(url,
                              data=json.dumps(params),
@@ -490,8 +592,9 @@ def cancel_job(chip):
 
     def post_action(url):
         return requests.post(url,
-                             data=json.dumps(__build_post_params(chip,
-                                                                 job_hash=chip.status['jobhash'])),
+                             data=json.dumps(__build_post_params(
+                                 chip,
+                                 job_hash=chip.get('record', 'remoteid'))),
                              timeout=__timeout)
 
     def success_action(resp):
@@ -508,8 +611,9 @@ def delete_job(chip):
 
     def post_action(url):
         return requests.post(url,
-                             data=json.dumps(__build_post_params(chip,
-                                                                 job_hash=chip.status['jobhash'])),
+                             data=json.dumps(__build_post_params(
+                                 chip,
+                                 job_hash=chip.get('record', 'remoteid'))),
                              timeout=__timeout)
 
     def success_action(resp):
@@ -531,7 +635,7 @@ def fetch_results_request(chip, node, results_path):
     '''
 
     # Set the request URL.
-    job_hash = chip.status['jobhash']
+    job_hash = chip.get('record', 'remoteid')
 
     # Fetch results archive.
     with open(results_path, 'wb') as zipf:
@@ -571,7 +675,7 @@ def fetch_results(chip, node, results_path=None):
 
     # Collect local values.
     top_design = chip.get('design')
-    job_hash = chip.status['jobhash']
+    job_hash = chip.get('record', 'remoteid')
     local_dir = chip.get('option', 'builddir')
 
     # Set default results archive path if necessary, and fetch it.

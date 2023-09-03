@@ -168,13 +168,12 @@ def test_sc_remote_check_progress(monkeypatch, unused_tcp_port, scroot):
     chip.load_target('freepdk45_demo')
     chip.status['remote_cfg'] = remote_cfg
     # Start the run, but don't wait for it to finish.
-    client.remote_preprocess(chip, chip.list_steps())
-    client.request_remote_run(chip)
+    client._remote_preprocess(chip, chip.list_steps())
+    client._request_remote_run(chip)
 
     # Check job progress.
     monkeypatch.setattr("sys.argv", ['sc-remote',
-                                     '-credentials', '.test_remote_cfg',
-                                     '-jobid', chip.status['jobhash']])
+                                     '-credentials', '.test_remote_cfg'])
     retcode = sc_remote.main()
 
     assert retcode == 0
@@ -208,14 +207,13 @@ def test_sc_remote_reconnect(monkeypatch, unused_tcp_port, scroot):
     chip.load_target('freepdk45_demo')
     chip.status['remote_cfg'] = remote_cfg
     # Start the run, but don't wait for it to finish.
-    client.remote_preprocess(chip, chip.list_steps())
-    client.request_remote_run(chip)
+    client._remote_preprocess(chip, chip.list_steps())
+    client._request_remote_run(chip)
 
     # Mock CLI parameters, and the '_finalize_run' call
     # which expects a non-mocked build directory.
     monkeypatch.setattr("sys.argv", ['sc-remote',
                                      '-credentials', '.test_remote_cfg',
-                                     '-jobid', chip.status['jobhash'],
                                      '-reconnect',
                                      '-cfg', os.path.join(chip._getworkdir(),
                                                           'import',
