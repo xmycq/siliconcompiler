@@ -32,7 +32,7 @@ import packaging.version
 import packaging.specifiers
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
-from siliconcompiler.remote.client import remote_preprocess, remote_run, delete_job
+from siliconcompiler.remote.client import remote_preprocess, remote_run
 from siliconcompiler.schema import Schema, SCHEMA_VERSION
 from siliconcompiler import scheduler
 from siliconcompiler import utils
@@ -4148,8 +4148,6 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
             self._init_logger(step='remote', index='0', in_run=True)
             remote_run(self)
 
-            # Delete the job's data from the server.
-            delete_job(self)
             # Restore logger
             self._init_logger(in_run=True)
             # Restore steplist
