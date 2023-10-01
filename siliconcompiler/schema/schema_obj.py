@@ -17,6 +17,12 @@ import sys
 import shlex
 
 try:
+    import shtab
+    _has_shtab = True
+except ImportError:
+    _has_shtab = False
+
+try:
     import yaml
     _has_yaml = True
 except ImportError:
@@ -1192,6 +1198,10 @@ class Schema:
             else:
                 scargs.append(argument)
 
+        # Add argument to generate tab completion code
+        if _has_shtab:
+            shtab.add_argument_to(parser, ["-print-completion"])
+
         if version:
             parser.add_argument('-version', action='version', version=version)
 
@@ -1206,6 +1216,10 @@ class Schema:
 
         # Grab argument from pre-process sysargs
         cmdargs = vars(parser.parse_args(scargs))
+
+        # Remove tab completion command
+        if _has_shtab:
+            del cmdargs['print_completion']
 
         extra_params = None
         if additional_args:
