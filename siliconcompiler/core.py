@@ -33,7 +33,8 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from siliconcompiler.remote import client
 from siliconcompiler.schema import Schema, SCHEMA_VERSION
-from siliconcompiler import scheduler
+#from siliconcompiler import scheduler
+from siliconcompiler import dispatchers
 from siliconcompiler import utils
 from siliconcompiler import units
 from siliconcompiler import _metadata
@@ -3534,17 +3535,26 @@ If you are sure that your working directory is valid, try running `cd $(pwd)`.""
 
         self._setupnode(flow, step, index, status, replay)
 
+        # Run node with the configured dispatch settings.
+        flow = self.get('option', 'flow')
+        dispatch = self.get('option', 'dispatcher', step=step, index=index)
+        if (not dispatch) or (dispatch not in dispatchers.__all__):
+            self.logger.warning(f'Unrecognized dispatcher: "{dispatch}". Defaulting to local run.')
+            dispatch = 'local'
+        run_method = getattr(dispatchers, dispatch).run_node
+        run_method(self, step, index, start_time=wall_start)
+
         # Defer job to compute node
         # If the job is configured to run on a cluster, collect the schema
         # and send it to a compute node for deferred execution.
         # (Run the initial starting nodes stage[s] locally)
-        flow = self.get('option', 'flow')
-        if self.get('option', 'scheduler', 'name', step=step, index=index) and \
-           self.get('flowgraph', flow, step, index, 'input'):
-            scheduler._defernode(self, step, index)
-        else:
-            self._executenode(step, index)
-            self._finalizenode(step, index, wall_start)
+        #flow = self.get('option', 'flow')
+        #if self.get('option', 'scheduler', 'name', step=step, index=index) and \
+        #   self.get('flowgraph', flow, step, index, 'input'):
+        #    scheduler._defernode(self, step, index)
+        #else:
+        #    self._executenode(step, index)
+        #    self._finalizenode(step, index, wall_start)
 
         # return to original directory
         os.chdir(cwd)

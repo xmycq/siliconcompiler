@@ -2308,6 +2308,23 @@ def schema_option(cfg):
             """)
 
     # TODO: with modular flows does this go away?
+    scparam(cfg, ['option', 'dispatcher'],
+            sctype='enum',
+            enum=["local", "slurm"],
+            scope='job',
+            shorthelp="Dispatch method for running flowgraph nodes.",
+            switch="-dispatcher <str>",
+            pernode='optional',
+            example=[
+            "cli: -dispatcher local",
+            "api: chip.set('option', 'dispatcher', 'slurm', step='route', index='0')"],
+            schelp="""
+            Sets how SC should dispatch flowgraph nodes for execution. Valid options:
+            local: Run on the same machine that is running the SC job.
+            slurm: Submit node to a Slurm cluster which is connected to the
+                   machine that is running the SC job.
+            """)
+
     scparam(cfg, ['option', 'frontend'],
             sctype='str',
             scope='job',
