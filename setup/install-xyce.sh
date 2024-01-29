@@ -8,7 +8,7 @@ src_path=$(cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P)
 # Install core dependencies.
 sudo apt-get install -y build-essential gcc g++ make cmake automake autoconf bison flex git libblas-dev \
     liblapack-dev liblapack64-dev libfftw3-dev libsuitesparse-dev libopenmpi-dev libboost-all-dev \
-    libnetcdf-dev libmatio-dev gfortran libfl-dev libtool python3-venv
+    libnetcdf-dev libmatio-dev gfortran libfl-dev libtool
 
 mkdir -p deps
 cd deps
@@ -16,11 +16,6 @@ cd deps
 if [ -z ${PREFIX} ]; then
     PREFIX=~/.local
 fi
-
-# Install CMAKE
-python3 -m venv .xyce --clear
-. .xyce/bin/activate
-python3 -m pip install cmake
 
 # Download Trilinos.
 ## Version specified in: https://github.com/Xyce/Xyce/blob/master/INSTALL.md#building-trilinos
@@ -62,4 +57,4 @@ cmake \
 
 cmake --build . -j$(nproc)
 cmake --build . -j$(nproc) --target xycecinterface
-sudo -E PATH="$PATH" make install
+sudo make install
