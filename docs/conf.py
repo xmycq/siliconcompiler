@@ -45,7 +45,6 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.imgconverter',
     'sphinx.ext.autosummary',
-    'sphinx_design',                                  # helps with grid views
     'siliconcompiler.sphinx_ext.dynamicgen',
     'schemagen',
     'clientservergen',
@@ -71,22 +70,13 @@ suppress_warnings = ['autosectionlabel.*']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'pydata_sphinx_theme'
+html_theme = 'sphinx_rtd_theme'
 
 html_theme_options = {
     "collapse_navigation": True,
-    # 'logo_only': True,
+    'logo_only': True,
     # 'display_version': True,
-    # 'navigation_depth': 4,
-    "show_toc_level": 3,   # this automatically displays three levels
-    "logo": {
-        "image_light": 'sc_logo_with_text.png',
-        "image_dark": 'sc_logo_with_text.png',
-    },
-    "github_url": "https://github.com/siliconcompiler/siliconcompiler",  # these are top right
-
-    # Add light/dark mode and documentation version switcher:
-    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    'navigation_depth': 4,
 }
 
 # Custom sidebar templates, must be a dictionary that maps document names

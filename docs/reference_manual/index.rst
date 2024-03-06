@@ -7,9 +7,9 @@ References
 The following sections provides details on the functions, modules and objects included in SiliconCompiler.
 To learn how to use SiliconCompiler, see the :ref:`user guide`. 
 
-.. _building_blocks:
+Building Blocks
+---------------
 .. toctree::
-   :caption: Building Blocks
    :maxdepth: 1
    :numbered:
 	      
@@ -20,10 +20,10 @@ To learn how to use SiliconCompiler, see the :ref:`user guide`.
    Libraries <predef_modules/libs>
    Checklists <predef_modules/checklists>
 
-.. _api_refs:
 
+API References
+---------------
 .. toctree::
-   :caption: API References
    :maxdepth: 4
    :numbered:
 
@@ -33,8 +33,9 @@ To learn how to use SiliconCompiler, see the :ref:`user guide`.
    server_api
    floorplan_api
 
+Appendix
+--------
 .. toctree::
-   :caption: Appendix
    :maxdepth: 3
    :numbered:
 

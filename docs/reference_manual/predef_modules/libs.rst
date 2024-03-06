@@ -1,4 +1,3 @@
-.. _libs_directory:
 
 Pre-Defined Libraries
 ========================

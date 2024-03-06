@@ -1,4 +1,3 @@
-.. _pdk_directory:
 
 Pre-Defined PDKs
 ==================

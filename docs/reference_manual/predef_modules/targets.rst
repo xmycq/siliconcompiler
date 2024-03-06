@@ -1,4 +1,3 @@
-.. _targets_directory:
 
 Pre-Defined Targets
 ====================

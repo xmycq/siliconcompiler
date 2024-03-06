@@ -25,64 +25,19 @@ Welcome to SiliconCompiler's Documentation!
 **Useful Links**:
 :ref:`Installation <installation>` | `GitHub Repo <https://github.com/siliconcompiler/siliconcompiler>`_ | `File an Issue <https://github.com/siliconcompiler/siliconcompiler/issues>`_
 
-.. grid:: 2
 
-    .. grid-item-card::
+The fastest way to get started, after installation, is to walk through a simple demo!
+:ref:`Quickstart Guide <Quickstart guide>`
 
-        The fastest way to get started, after installation, is to walk through a simple demo!
+A more complete introduction for new users, this
+section is for those who want to use their own designs using pre-defined build flows.
+:ref:`Introductory User Guide <User Guide>`
 
-        +++
+This section contains useful lookup information, like flow building blocks, the schema and other API references.
+:ref:`Reference Manual <References>`
 
-        .. button-ref:: user_guide/quickstart
-            :expand:
-            :color: secondary
-            :click-parent:
-
-            Quickstart Guide
-
-    .. grid-item-card::
-
-        A more complete introduction for new users, this
-	section is for those who want to use their own designs using pre-defined build flows.
-
-
-        +++
-
-        .. button-ref:: user_guide/index
-            :expand:
-            :color: secondary
-            :click-parent:
-
-            Introductory User Guide
-	    
-
-    .. grid-item-card::
-
-        This section contains useful lookup information, like flow building blocks, the schema and other API references.
-
-        +++
-
-        .. button-ref:: reference_manual/index
-            :expand:
-            :color: secondary
-            :click-parent:
-
-            Reference Manual
-
-    .. grid-item-card::
-
-        This section is for users who are already familiar with the basics in User Guide and would like to build their own flows or add additional functionality.
-
-
-        +++
-
-        .. button-ref:: development_guide/index
-            :expand:
-            :color: secondary
-            :click-parent:
-
-            Advanced Guide
-	    
+This section is for users who are already familiar with the basics in User Guide and would like to build their own flows or add additional functionality.
+:ref:`Advanced Guide <Advanced Guide>`
 
 
 **Getting Help**

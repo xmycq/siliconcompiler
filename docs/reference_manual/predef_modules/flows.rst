@@ -1,4 +1,3 @@
-.. _flows_directory:
 
 Pre-Defined Flows
 ====================

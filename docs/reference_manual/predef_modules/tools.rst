@@ -1,4 +1,3 @@
-.. _tools_directory:
 
 Pre-Defined Tools
 ===================
